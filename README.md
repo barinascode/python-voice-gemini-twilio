@@ -16,7 +16,10 @@ El objetivo es lograr una conversación telefónica inteligente, natural y fluid
 
 ## Requisitos de Despliegue en Producción (VPS Linux)
 
-Para operar de forma persistente y que Twilio no rechace la conexión WebSocket bidireccional, es estricto requerir de un entorno con Proxy Inverso y certificados SSL (HTTPS/WSS).
+> [!WARNING]
+> **REQUISITO ESTRICTO DE SSL:** Twilio requiere obligatoriamente que la conexión WebSocket se realice a través de un protocolo seguro (`wss://`). Si expones la aplicación usando únicamente HTTP (`ws://`) con una IP pública, **Twilio abortará y colgará las llamadas de inmediato** al intentar conectarse al stream de audio. Es estrictamente necesario el uso de un Proxy Inverso con certificados SSL válidos.
+
+Para operar de forma persistente, es estricto requerir de un entorno con Proxy Inverso y certificados SSL (HTTPS/WSS).
 
 *   **SO:** Servidor Linux (Ubuntu 20.04/22.04 recomendado).
 *   **Python:** 3.8.10+.
