@@ -37,9 +37,9 @@ async def make_call(req: CallRequest):
 @router.post("/twiml")
 async def get_twiml(request: Request):
     """Devuelve el TwiML que conecta la llamada con nuestro WebSocket."""
-    # Twilio envía los datos de la llamada como Form encoded
-    form_data = await request.form()
-    print(f"Twilio disparó /twiml para la llamada: {form_data.get('CallSid')}")
+    # Extraemos manualmente el CallSid de los formData que envía Twilio
+    body = await request.body()
+    print(f"Twilio disparó /twiml con payload: {body.decode('utf-8')}")
 
     # Reemplazamos http/https por ws/wss para construir el puente WebSocket
     host = settings.PUBLIC_URL.replace("https://", "").replace("http://", "")
