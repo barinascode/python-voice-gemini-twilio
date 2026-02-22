@@ -67,5 +67,14 @@ async def get_twiml(request: Request):
 @router.post("/call-status")
 async def call_status(request: Request):
     """Recibe los eventos asíncronos de Twilio sobre el estado de la llamada (ringing, answered, completed)."""
-    # Solo retornamos 200 OK para que Twilio no asuma que nuestra app falló si configuraste esta URL en el webhook.
+    try:
+        form_data = await request.form()
+        status_info = dict(form_data)
+        print(f"\n[TWILIO CALL STATUS] Estado actualizado: {status_info.get('CallStatus')}")
+        if 'ErrorMessage' in status_info:
+            print(f"[TWILIO ERROR LOG] {status_info.get('ErrorMessage')}")
+        print(f"[TWILIO DATOS COMPLETOS]: {status_info}\n")
+    except Exception as e:
+        print(f"[DEBUG] Error leyendo call_status form: {e}")
+        
     return Response(content="OK", media_type="text/plain")
