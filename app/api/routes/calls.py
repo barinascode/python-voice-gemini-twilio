@@ -63,3 +63,9 @@ async def get_twiml(request: Request):
     print(f"Generando TwiML:\n{twiml_str}")
     
     return Response(content=twiml_str, media_type="text/xml")
+
+@router.post("/call-status")
+async def call_status(request: Request):
+    """Recibe los eventos asíncronos de Twilio sobre el estado de la llamada (ringing, answered, completed)."""
+    # Solo retornamos 200 OK para que Twilio no asuma que nuestra app falló si configuraste esta URL en el webhook.
+    return Response(content="OK", media_type="text/plain")
