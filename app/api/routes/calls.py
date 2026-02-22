@@ -57,7 +57,7 @@ async def get_twiml(request: Request):
     # Agregamos una pausa larga después del connect para darle vida a la llamada mientras el WS responde 
     # y así evitamos colgar automáticamente.
     from twilio.twiml.voice_response import Pause
-    response.append(Pause(length=60))
+    response.append(Pause(length=5))
     
     twiml_str = str(response)
     print(f"Generando TwiML:\n{twiml_str}")
