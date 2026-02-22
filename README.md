@@ -1,67 +1,111 @@
-# Python Voice Agent with Gemini and Twilio
+# Agente de Voz con Gemini 2.5 y Twilio
 
-Este proyecto implementa un agente de voz telefónico en tiempo real utilizando Python (FastAPI), la API REST y Media Streams de Twilio, y la API Multimodal Live de Google Gemini (WebSockets).
+Este proyecto implementa un agente de voz telefónico en tiempo real para producción utilizando Python (FastAPI), la API REST / Media Streams de Twilio, y la API Multimodal Live de Google Gemini (WebSockets).
 
-El objetivo es lograr una conversación telefónica natural, con mínima latencia y con soporte para interrupciones (barge-in), donde el agente de IA inicia la conversación tan pronto como el usuario contesta la llamada.
+El objetivo es lograr una conversación telefónica inteligente, natural y fluida con muy baja latencia, con soporte nativo para interrupciones (barge-in). El agente toma la iniciativa conversacional tan pronto como la llamada es contestada.
 
-## Requisitos Previos
+## Arquitectura y Flujo
 
-1.  Python 3.9 o superior.
-2.  Una cuenta de [Twilio](https://www.twilio.com/) con un número de teléfono adquirido y saldo disponible.
-3.  Una clave API de [Google AI Studio](https://aistudio.google.com/) con acceso a la Multimodal Live API (ej: `gemini-2.5-flash-native-audio-latest`).
-4.  [ngrok](https://ngrok.com/) para exponer tu servidor local a Internet y que Twilio pueda comunicarse con él.
+1. El usuario envía un POST al servidor para iniciar una llamada.
+2. El servidor ordena a Twilio llamar al destino.
+3. Cuando el destino contesta, Twilio establece un túnel WebSocket (`/stream`) con el servidor.
+4. El servidor abre simultáneamente un túnel concurrente hacia Google Gemini API.
+5. El servidor traduce el audio g.711 mu-law (8kHz) de Twilio a PCM Lineal (16kHz/24kHz) para Gemini al vuelo en fragmentos ultra-pequeños, reduciendo drásticamente cualquier latencia.
 
-## Configuración del Entorno Local
+---
 
-1.  **Clonar el repositorio y crear un entorno virtual:**
-    ```bash
-    python -m venv .venv
-    # En Windows:
-    .\.venv\Scripts\activate
-    # En macOS/Linux:
-    # source .venv/bin/activate
-    ```
+## Requisitos de Despliegue en Producción (VPS Linux)
 
-2.  **Instalar las dependencias:**
-    ```bash
-    pip install fastapi "uvicorn[standard]" twilio websockets python-dotenv
-    ```
+Para operar de forma persistente y que Twilio no rechace la conexión WebSocket bidireccional, es estricto requerir de un entorno con Proxy Inverso y certificados SSL (HTTPS/WSS).
 
-3.  **Configurar Variables de Entorno:**
-    Renombra el archivo `.env.example` a `.env` (o crea uno directamente) en la raíz con el siguiente contenido y reemplaza con tus valores:
-    ```env
-    TWILIO_ACCOUNT_SID=TuAccountSIDDeTwilio
-    TWILIO_AUTH_TOKEN=TuAuthTokenDeTwilio
-    TWILIO_PHONE_NUMBER=TuNumeroDeTwilioConCodigoDeArea
-    GEMINI_API_KEY=TuClaveAPIdeGoogleGemini
+*   **SO:** Servidor Linux (Ubuntu 20.04/22.04 recomendado).
+*   **Python:** 3.8.10+.
+*   **Web Server:** Nginx.
+*   **Certificados:** Let's Encrypt (Certbot).
+*   **Cuentas:** Twilio (con número habilitado) y Google AI Studio.
 
-    # El host público que generará ngrok (se agregará en el siguiente paso)
-    PUBLIC_URL=https://xxxx-xxx-xx-x-x.ngrok.app
-    ```
+## 1. Configuración del SO y Entorno de Python
 
-## Ejecución y Pruebas
+Clona tu repositorio en el VPS de Linux en `/var/www/` o tu directorio de preferencia y prepara el entorno virtual:
 
-Para probar el agente localmente, necesitas exponer el puerto de tu servidor de desarrollo con `ngrok`.
+```bash
+# Instalar python3.8-venv si no lo tienes
+sudo apt update
+sudo apt install python3.8-venv -y
 
-1.  **Levantar ngrok en un terminal separado:**
-    ```bash
-    ngrok http 8000
-    ```
-    *Copia la URL `https` que te proporciona ngrok y ponla en la variable `PUBLIC_URL` de tu archivo `.env`.*
+# Crear y activar entorno
+python3.8 -m venv .venv
+source .venv/bin/activate
 
-2.  **Iniciar el servidor FastAPI:**
-    ```bash
-    uvicorn app.main:app --reload
-    ```
-    *Cualquier cambio en el código reiniciará el servidor automáticamente.*
+# Instalar los requerimientos de la rama modular
+pip install fastapi "uvicorn[standard]" twilio websockets python-dotenv
+```
 
-3.  **Realizar una llamada de prueba:**
-    Utiliza una herramienta como Postman, cURL o cualquier cliente HTTP para enviar una petición `POST` al endpoint `/make-call` de tu servidor local. Asegúrate de incluir el número de destino (tu teléfono móvil) en el body.
-    
-    *Ejemplo con PowerShell:*
-    ```powershell
-    Invoke-RestMethod -Uri "http://localhost:8000/make-call" -Method Post -ContentType "application/json" -Body '{"destination_number": "+58414XXXXXXX"}'
-    ```
+## 2. Variables de Entorno
+
+Crea un archivo `.env` en la raíz del proyecto.
+El valor de `PUBLIC_URL` debe ser tu **dominio seguro con SSL** (p.ej. `https://api.midominio.com`).
+
+```env
+TWILIO_ACCOUNT_SID=TuAccountSIDDeTwilio
+TWILIO_AUTH_TOKEN=TuAuthTokenDeTwilio
+TWILIO_PHONE_NUMBER=TuNumeroDeTwilio
+
+GEMINI_API_KEY=TuClaveAPIdeGoogleGemini
+
+PUBLIC_URL=https://api.midominio.com
+```
+
+## 3. Ejecución como Servicio Constante (PM2 / Systemd)
+
+La aplicación FastApi nativamente está configurada para correr por defecto en el puerto `8080` de tu ambiente local.
+*Ejemplo iniciando con screen o tmux en background:*
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+## 4. Configuración del Proxy Reverso Nginx + SSL
+
+Twilio requiere conexión estricta vía WebSockets seguros (`wss://`). Para lograr esto, usa Nginx para enrutar el puerto `8080` de Python hacia los puertos `80/443` estándar en la web, configurando los headers "Upgrade" necesarios.
+
+Crea un VirtualHost simplificado en Nginx (`/etc/nginx/sites-available/api_agent`):
+
+```nginx
+server {
+    server_name api.midominio.com;
+
+    location / {
+        proxy_pass http://127.0.0.0:8080;
+        
+        # Soportes necesarios para WSS (WebSockets)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Luego ejecuta certbot para otorgar el cifrado TSL automáticamente al bloque anterior:
+```bash
+sudo certbot --nginx -d api.midominio.com
+sudo systemctl reload nginx
+```
+
+## 5. Iniciar la Llamada de Prueba
+
+Con el servidor Python andando, Nginx manejando el SSL, y el `.env` apuntando a `PRIVATE_URL=https://api.midominio.com`, envía la solicitud:
+
+```bash
+curl -X POST https://api.midominio.com/make-call \
+     -H "Content-Type: application/json" \
+     -d '{"destination_number": "+58414XXXXXXX"}'
+```
 
     1. El servidor enviará la petición a Twilio para que llame al `destination_number`.
     2. Cuando contestes la llamada, Twilio iniciará el TwiML `<Connect><Stream>` apuntando al WebSocket de tu servidor (`/stream`).
