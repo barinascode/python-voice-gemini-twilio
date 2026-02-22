@@ -47,12 +47,17 @@ async def get_twiml(request: Request):
     
     response = VoiceResponse()
     connect = Connect()
-    
-    # IMPORTANTE: Definir los tracks para evitar que se cuelgue. (bothbp significa dual bidireccional)
-    # Algunos entornos de Twilio requieren `name` o que declaremos explícitamente el tipo de track.
-    connect.stream(url=f"{prot}://{host}/stream", track="both_tracks")
-    
+    # IMPORTANTE: A veces Twilio cuelga llamadas instantáneamente tras el <Connect><Stream> si no hay un 
+    # audio a reproducir que mantenga la llamada viva.
+    # El track predeterminado es "inbound_track". Usamos "both_tracks" sólo si realmente sabemos que Twilio
+    # lo acepta nativo en tu cuenta, pero para mayor estabilidad quitaremos el flag track="both_tracks".
+    connect.stream(url=f"{prot}://{host}/stream")
     response.append(connect)
+    
+    # Agregamos una pausa larga después del connect para darle vida a la llamada mientras el WS responde 
+    # y así evitamos colgar automáticamente.
+    from twilio.twiml.voice_response import Pause
+    response.append(Pause(length=60))
     
     twiml_str = str(response)
     print(f"Generando TwiML:\n{twiml_str}")
