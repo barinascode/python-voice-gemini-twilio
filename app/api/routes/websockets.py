@@ -67,7 +67,7 @@ async def websocket_endpoint(twilio_ws: WebSocket):
                         
                         event = message.get("event")
                         if event == "connected":
-                            print("Llamada Twilio conectada")
+                            print("Llamada Twilio conectada al WebSocket")
                         elif event == "start":
                             stream_sid = message["start"]["streamSid"]
                             print(f"Twilio Media Stream Iniciado: {stream_sid}")
@@ -93,7 +93,7 @@ async def websocket_endpoint(twilio_ws: WebSocket):
                         elif event == "mark":
                             pass
                 except WebSocketDisconnect:
-                    print("Twilio WS Desconectado")
+                    print("Twilio WS Desconectado desde el cliente telefónico")
                 except Exception as e:
                     print(f"Error en receive_from_twilio: {e}")
 
@@ -103,6 +103,12 @@ async def websocket_endpoint(twilio_ws: WebSocket):
                     async for message in gemini_ws:
                         response = json.loads(message)
                         
+                        # 1. Chequear si hay errores arrojados por Gemini
+                        if "error" in response:
+                            print(f"ERROR DESDE GEMINI: {response['error']}")
+                            continue
+                            
+                        # 2. Parsear el audio de Gemini
                         if "serverContent" in response:
                             model_turn = response["serverContent"].get("modelTurn")
                             if model_turn:
@@ -131,11 +137,12 @@ async def websocket_endpoint(twilio_ws: WebSocket):
                                     "streamSid": stream_sid
                                 }
                                 await twilio_ws.send_text(json.dumps(clear_msg))
-                except websockets.exceptions.ConnectionClosed:
-                    print("Gemini WS Desconectado")
+                except websockets.exceptions.ConnectionClosed as e:
+                    print(f"Gemini WS Desconectado: {e}")
                 except Exception as e:
                     print(f"Error en receive_from_gemini: {e}")
 
+            print("Iniciando tareas concurrentes Twi-Gem...")
             # Correr ambas tareas
             task_twilio = asyncio.create_task(receive_from_twilio())
             task_gemini = asyncio.create_task(receive_from_gemini())
