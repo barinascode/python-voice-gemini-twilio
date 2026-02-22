@@ -68,13 +68,18 @@ async def get_twiml(request: Request):
 async def call_status(request: Request):
     """Recibe los eventos asíncronos de Twilio sobre el estado de la llamada (ringing, answered, completed)."""
     try:
-        form_data = await request.form()
-        status_info = dict(form_data)
+        # Twilio manda application/x-www-form-urlencoded
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8')
+        
+        from urllib.parse import parse_qsl
+        status_info = dict(parse_qsl(body_str))
+        
         print(f"\n[TWILIO CALL STATUS] Estado actualizado: {status_info.get('CallStatus')}")
         if 'ErrorMessage' in status_info:
             print(f"[TWILIO ERROR LOG] {status_info.get('ErrorMessage')}")
         print(f"[TWILIO DATOS COMPLETOS]: {status_info}\n")
     except Exception as e:
-        print(f"[DEBUG] Error leyendo call_status form: {e}")
+        print(f"[DEBUG] Error leyendo call_status body: {e}")
         
     return Response(content="OK", media_type="text/plain")
