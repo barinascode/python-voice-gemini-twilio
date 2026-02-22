@@ -27,7 +27,8 @@ async def make_call(req: CallRequest):
         call = twilio_client.calls.create(
             to=req.destination_number,
             from_=settings.TWILIO_PHONE_NUMBER,
-            url=f"{settings.PUBLIC_URL}/twiml"
+            url=f"{settings.PUBLIC_URL}/twiml",
+            method="POST"
         )
         return {"status": "success", "call_sid": call.sid}
     except Exception as e:
