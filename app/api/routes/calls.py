@@ -20,8 +20,8 @@ async def make_call(req: CallRequest):
     if not twilio_client:
         raise HTTPException(status_code=500, detail="Twilio no está configurado correctamente.")
     
-    if settings.PUBLIC_URL == "none" or "ngrok" not in settings.PUBLIC_URL:
-        raise HTTPException(status_code=400, detail="Falta PUBLIC_URL en config (p.ej. url de ngrok)")
+    if settings.PUBLIC_URL == "none" or not settings.PUBLIC_URL.startswith("http"):
+        raise HTTPException(status_code=400, detail="Falta un PUBLIC_URL válido en config (p.ej. http://IP:PUERTO o https://dominio.com)")
 
     try:
         call = twilio_client.calls.create(
@@ -36,11 +36,13 @@ async def make_call(req: CallRequest):
 @router.post("/twiml")
 async def get_twiml(request: Request):
     """Devuelve el TwiML que conecta la llamada con nuestro WebSocket."""
+    # Reemplazamos http/https por ws/wss para construir el puente WebSocket
     host = settings.PUBLIC_URL.replace("https://", "").replace("http://", "")
+    prot = "wss" if settings.PUBLIC_URL.startswith("https") else "ws"
     
     response = VoiceResponse()
     connect = Connect()
-    connect.stream(url=f"wss://{host}/stream")
+    connect.stream(url=f"{prot}://{host}/stream")
     response.append(connect)
     
     return Response(content=str(response), media_type="text/xml")

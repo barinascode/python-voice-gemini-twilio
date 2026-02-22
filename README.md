@@ -24,7 +24,7 @@ El objetivo es lograr una conversación telefónica natural, con mínima latenci
 
 2.  **Instalar las dependencias:**
     ```bash
-    pip install fastapi "uvicorn[standard]" twilio websockets google-genai python-dotenv
+    pip install fastapi "uvicorn[standard]" twilio websockets python-dotenv
     ```
 
 3.  **Configurar Variables de Entorno:**
